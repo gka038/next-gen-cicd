@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/gka038/next-gen-cicd
-    targetRevision: fm/ngc-1
+    targetRevision: main
     path: agents/overview-agent
     directory:
       exclude: "application.yaml"

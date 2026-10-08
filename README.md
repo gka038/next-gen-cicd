@@ -11,7 +11,7 @@ gives you:
 - **Registry** — Harbor, itself backed by its own bundled Trivy scanner.
 - **GitOps delivery** — Argo CD (app-of-apps, this whole repo), Argo
   Rollouts (canary/progressive delivery with metric-based auto-rollback),
-  optionally Kargo (promotion across stages).
+  optionally Kargo (promotion across stages, needs cert-manager).
 - **AI agent orchestration** — Argo Workflows + KEDA, running both the
   nightly overview agent below and whatever agent workloads the product
   itself uses.
@@ -57,12 +57,22 @@ directory source.
 
 ## Bootstrap order
 
-1. **Install Argo CD** — see `bootstrap/README.md`. This is the one
-   imperative step; Argo CD can't GitOps-install itself.
-2. **Apply the app-of-apps** — `kubectl apply -n argocd -f apps/root-application.yaml`.
-   This points Argo CD at `apps/`, which renders one child `Application` per
-   enabled component group, which in turn each render the component(s)
-   inside it.
+Fastest path — one command, from `bootstrap/`:
+
+```bash
+cd bootstrap && helm dependency update && helm install next-gen-cicd . --wait --timeout 10m
+```
+
+This installs Argo CD and applies the app-of-apps in one shot, with a
+`--set components.<group>=false` flag per group if you want fewer than
+everything from the start. See `bootstrap/README.md` for what this does
+and the step-by-step equivalent, if you'd rather drive it by hand:
+
+1. **Install Argo CD** — this is the one imperative step; Argo CD can't
+   GitOps-install itself.
+2. **Apply the app-of-apps** — points Argo CD at `apps/`, which renders one
+   child `Application` per enabled component group, which in turn each
+   render the component(s) inside it.
 3. Everything from here on is managed by Argo CD syncing this Git
    repository. Configure the secrets each component needs (below) as you
    turn components on.
@@ -91,10 +101,11 @@ overview-agent CronWorkflow separately since it depends on `ci`/`workflows`
 being present to do anything useful.
 
 Within the `delivery` and `observability` groups, more than one component
-shares a toggle (Argo Rollouts + Kargo; kube-prometheus-stack + Loki + Tempo
-+ OTel Collector + Langfuse + the ClickHouse Operator it needs). To drop
-just one of those — Kargo, say, or Langfuse — delete that component's
-subdirectory instead of flipping the whole group off.
+shares a toggle (Argo Rollouts + Kargo + cert-manager, which Kargo's webhook
+server requires; kube-prometheus-stack + Loki + Tempo + OTel Collector +
+Langfuse + the ClickHouse Operator it needs). To drop just one of those —
+Kargo and cert-manager together, say, or just Langfuse — delete that
+component's subdirectory instead of flipping the whole group off.
 
 ## Secrets you need to supply
 
@@ -216,26 +227,57 @@ secret` instead) and the Langfuse/ClickHouse piece of `observability`.
 
 ## What's been validated, and what hasn't
 
-There's no live cluster in this environment to apply against, so validation
-here was static:
+Static validation: `helm lint` + `helm template <chart> -f <values>` against
+the real pinned chart version for every Helm-based component, and
+`kubeconform -strict` (with the datreeio CRDs-catalog schemas for Argo CD/
+Rollouts/Workflows/Kyverno/External Secrets CRDs) against every plain
+manifest — the vendored Tekton release YAML, this repo's own Tekton Tasks/
+Pipelines/Triggers, the Kyverno policy, the agent's CronWorkflow/RBAC, and
+every `Application` resource. The app-of-apps chart (`apps/`) renders and
+its toggles were exercised (each `components.*: false` correctly drops that
+group's `Application`).
 
-- `helm lint` and `helm template <chart> -f <values>` against the real
-  pinned chart version, for every Helm-based component.
-- `kubeconform -strict` (with the datreeio CRDs-catalog schemas for
-  Argo CD/Rollouts/Workflows/Kyverno/External Secrets CRDs) against every
-  plain manifest — the vendored Tekton release YAML, this repo's own
-  Tekton Tasks/Pipelines/Triggers, the Kyverno policy, the agent's
-  CronWorkflow/RBAC, and every `Application` resource.
-- The app-of-apps chart (`apps/`) renders and its toggles were exercised
-  (each `components.*: false` correctly drops that group's `Application`).
+This was also smoke-tested live, bootstrap order, against a real fresh
+single-node cluster (OrbStack's bundled Kubernetes, `local-path` default
+StorageClass) — Argo CD install, the root `Application`, and every
+component group reconciling for real. Confirmed working end-to-end: the
+app-of-apps cascade (root → group → component Applications, including the
+directory-source `include`/`exclude` filtering and `sync-wave` ordering for
+clickhouse-operator→langfuse and vault→external-secrets), Forgejo actually
+reaching `Running`, and most of the stack reaching `Synced`/`Healthy`. Three
+real bugs surfaced and were fixed as a result (all reflected in the current
+manifests, not just described here):
 
-What this **can't** verify without a real cluster: that Argo CD actually
-reconciles all of this cleanly end-to-end, that the multi-source `$values`
-Helm pattern behaves as expected against a live Argo CD (it's the documented
-pattern, but untested here), that Tekton Chains' signing flow and the
-Kyverno `verifyImages` policy actually agree on a real cosign key, that
-Vault's init/unseal/Kubernetes-auth sequence above is typo-free end to end,
-and that the overview agent's OpenHands invocation (CLI flags move fast
-upstream) still matches the pinned image tag. Treat first-apply on a real
-cluster as a smoke test, in roughly bootstrap order, one component group at
-a time rather than all nine at once.
+- **Argo CD's OCI Helm resolution drops the chart segment** when `chart` is
+  a separate field alongside a multi-segment `repoURL` — reproduced
+  identically against two unrelated registries (`code.forgejo.org` and
+  `ghcr.io`), confirmed by comparing against the repo-server's own `helm`
+  CLI succeeding on the identical pull. Forgejo and Kargo (this repo's only
+  two OCI-sourced charts) now use the `repoURL` embeds the full chart path
+  + `path: "."` pattern instead, which resolves correctly.
+- **Kargo needs cert-manager**: its webhook server's self-signed certificate
+  requires cert-manager's CRDs and webhook by default, and the chart has no
+  no-TLS mode. Added as a new component (`infrastructure/delivery/
+  cert-manager/`) ahead of Kargo via `sync-wave`.
+- **Argo CD's controller and repo-server were undersized**: both got
+  OOMKilled reconciling the full stack (~20 Applications, several large
+  charts) at the original 512Mi/256Mi limits. Bumped to 2Gi/1Gi in
+  `bootstrap/values.yaml`'s `argo-cd:` block — a number that reflects an
+  actual observed working set, not a guess.
+
+What this still can't fully verify from this environment: that every
+heavy component (Harbor, kube-prometheus-stack, Loki, Langfuse's
+ClickHouse/SeaweedFS stack) reaches steady-state `Healthy` under real
+resource pressure rather than just `Synced`/`Progressing` — the live test
+ran this repo's full default toggle set (everything on) simultaneously on
+one VM, which is more concurrent load than the "enable what you need"
+guidance above recommends, and some components were still pulling images or
+settling in when the test concluded. Also still unverified: that Tekton
+Chains' signing flow and the Kyverno `verifyImages` policy actually agree on
+a real cosign key end to end, that Vault's init/unseal/Kubernetes-auth
+sequence above is typo-free, and that the overview agent's OpenHands
+invocation (CLI flags move fast upstream) still matches the pinned image
+tag. Treat a production first-apply as a staged rollout — enable one
+component group at a time via `apps/values.yaml` rather than all nine at
+once — both to keep load manageable and to make any remaining issue easy to
+attribute.

@@ -1,0 +1,98 @@
+# One-command install:
+#   helm install next-gen-cicd ./bootstrap --dependency-update --wait --timeout 10m
+#
+# This installs Argo CD (the argo-cd/argo-cd chart, as a dependency below)
+# sized for a single node, then a post-install hook applies the app-of-apps
+# Application so Argo CD takes over from there — see apps/ for what each
+# `components.*` flag actually turns on.
+#
+# Turn a component group off before installing, or after (re-run
+# `helm upgrade` with the new values and Argo CD prunes it):
+#   helm upgrade next-gen-cicd ./bootstrap --reuse-values --set components.observability=false
+
+repo:
+  url: https://github.com/gka038/next-gen-cicd
+  targetRevision: main
+
+# One flag per component group, passed straight through as the root
+# Application's Helm values (apps/values.yaml's `components:` block — these
+# two must stay in sync; apps/values.yaml is still what Argo CD reads after
+# the first sync, this is only what seeds it).
+components:
+  scm: true
+  ci: true
+  registry: true
+  delivery: true
+  workflows: true
+  observability: true
+  policy: true
+  secrets: true
+  agents: true
+
+# Values for the argo-cd dependency chart (argoproj/argo-helm). Set
+# `argo-cd.enabled: false` only if Argo CD is already running elsewhere and
+# you just want this chart to apply the root Application against it.
+argo-cd:
+  enabled: true
+
+  # No external IdP in scope for this stack — drop Dex to save a pod.
+  dex:
+    enabled: false
+
+  # Sync/health notifications aren't wired to anything yet; skip the extra pod.
+  notifications:
+    enabled: false
+
+  controller:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        # Observed OOMKilling at 512Mi reconciling the full app-of-apps
+        # (~20 Applications, several large charts) on a real cluster.
+        memory: 2Gi
+
+  repoServer:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        # Observed OOMKilling at 256Mi for the same reason as controller above.
+        memory: 1Gi
+
+  server:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    # No cloud LoadBalancer on a single-node cluster: expose via ingress-nginx
+    # or port-forward. See the root README for both options.
+    service:
+      type: ClusterIP
+    ingress:
+      enabled: false
+      ingressClassName: nginx
+      hosts:
+        - argocd.local
+
+  applicationSet:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+
+  redis:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+
+  configs:
+    params:
+      server.insecure: false

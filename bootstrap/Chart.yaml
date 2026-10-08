@@ -1,0 +1,10 @@
+apiVersion: v2
+name: next-gen-cicd-installer
+description: One-command installer for the next-gen-cicd stack — installs Argo CD, then applies the app-of-apps with whichever component groups you enable.
+type: application
+version: 0.1.0
+dependencies:
+  - name: argo-cd
+    version: 10.10.1
+    repository: https://argoproj.github.io/argo-helm
+    condition: argo-cd.enabled

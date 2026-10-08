@@ -1,0 +1,45 @@
+# Runs after the argo-cd dependency's resources are created (with --wait,
+# after they're Ready — see the README for why --wait matters here: without
+# it, Argo CD's Application CRD may not be registered yet when this tries to
+# use it). Retries for a few minutes regardless, in case --wait was omitted.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-apply-root-app
+  namespace: argocd
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: {{ .Release.Name }}-apply-root-app
+      restartPolicy: Never
+      containers:
+        - name: apply-root-app
+          image: docker.io/alpine/k8s:1.33.9
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -u
+              echo "Applying the root Application (retrying until the Application CRD is registered)..."
+              for i in $(seq 1 60); do
+                if kubectl apply -f /manifests/root-application.yaml; then
+                  exit 0
+                fi
+                echo "Attempt $i failed, retrying in 5s..."
+                sleep 5
+              done
+              echo "Giving up after 60 attempts."
+              exit 1
+          volumeMounts:
+            - name: manifests
+              mountPath: /manifests
+              readOnly: true
+      volumes:
+        - name: manifests
+          configMap:
+            name: {{ .Release.Name }}-root-application

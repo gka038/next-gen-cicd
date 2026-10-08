@@ -1,0 +1,3 @@
+# Helm dependency archives — fetched fresh via `helm dependency update`;
+# only Chart.lock (the resolved version pin) is committed.
+**/charts/*.tgz

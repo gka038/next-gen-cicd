@@ -1,0 +1,29 @@
+next-gen-cicd is installing.
+
+{{- if (index .Values "argo-cd").enabled }}
+Argo CD is coming up in the "argocd" namespace, and a post-install job just
+applied (or is about to apply) the root Application pointed at:
+  {{ .Values.repo.url }} @ {{ .Values.repo.targetRevision }}
+{{- else }}
+Argo CD wasn't installed by this chart (argo-cd.enabled=false) — the
+post-install job applied the root Application against whatever Argo CD is
+already running in this cluster's "argocd" namespace.
+{{- end }}
+
+Check progress:
+  kubectl -n argocd get applications
+
+Get the initial admin password:
+  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+
+Reach the UI:
+  kubectl -n argocd port-forward svc/argocd-server 8080:443
+  # then open https://localhost:8080 (admin / the password above)
+
+Enabled component groups: {{ range $k, $v := .Values.components }}{{ if $v }}{{ $k }} {{ end }}{{ end }}
+Toggle one off:
+  helm upgrade {{ .Release.Name }} <this chart> --reuse-values --set components.<group>=false
+
+See the root README for what each component group needs configured before
+it's actually usable (admin passwords, cosign keys, the overview agent's
+Forgejo token, etc.) and for known single-node sizing caveats.

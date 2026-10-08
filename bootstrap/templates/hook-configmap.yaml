@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-root-application
+  namespace: argocd
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  root-application.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: root
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: {{ .Values.repo.url }}
+        targetRevision: {{ .Values.repo.targetRevision }}
+        path: apps
+        helm:
+          valuesObject:
+            components:
+              scm: {{ .Values.components.scm }}
+              ci: {{ .Values.components.ci }}
+              registry: {{ .Values.components.registry }}
+              delivery: {{ .Values.components.delivery }}
+              workflows: {{ .Values.components.workflows }}
+              observability: {{ .Values.components.observability }}
+              policy: {{ .Values.components.policy }}
+              secrets: {{ .Values.components.secrets }}
+              agents: {{ .Values.components.agents }}
+            repo:
+              url: {{ .Values.repo.url }}
+              targetRevision: {{ .Values.repo.targetRevision }}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

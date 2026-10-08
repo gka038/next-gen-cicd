@@ -1,0 +1,42 @@
+# Requires every image pulled from this stack's own Harbor registry to carry a
+# valid cosign signature (produced by the Tekton Chains signing step — see
+# infrastructure/ci/tekton). Starts in Audit mode: it reports violations
+# without blocking anything, since there's nothing signed yet on a fresh
+# cluster. Flip validationFailureAction to Enforce once the CI pipeline is
+# producing signed images end-to-end (see the root README).
+#
+# The cosign public key referenced below must exist as a Secret named
+# "cosign-public-key" in the "kyverno" namespace (key: cosign.pub) before this
+# policy can verify anything — see the root README for how to create it.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-signed-images
+  annotations:
+    policies.kyverno.io/title: Require Signed Images
+    policies.kyverno.io/category: Software Supply Chain
+    policies.kyverno.io/description: >-
+      Verifies that images from the in-cluster Harbor registry are signed
+      with cosign before they're admitted.
+spec:
+  validationFailureAction: Audit
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-harbor-image-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "harbor.local/*"
+          mutateDigest: true
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    secret:
+                      name: cosign-public-key
+                      namespace: kyverno

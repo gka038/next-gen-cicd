@@ -1,0 +1,25 @@
+# Applied once, by hand, after Argo CD itself is up (see bootstrap/README.md).
+# Everything else in this repo is reached by Argo CD syncing from here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gka038/next-gen-cicd
+    targetRevision: fm/ngc-1
+    path: apps
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

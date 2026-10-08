@@ -1,0 +1,17 @@
+# Single-node sizing for Argo Rollouts (argo-cd/argo-rollouts).
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+dashboard:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi

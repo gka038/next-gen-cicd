@@ -1,0 +1,25 @@
+# Scans the SBOM syft-sbom produced (rather than re-pulling the image) and
+# fails the TaskRun on HIGH/CRITICAL findings, as a second scanner alongside
+# Trivy so the two don't share a single vulnerability database's blind spots.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: grype-scan
+  namespace: tekton-pipelines
+spec:
+  description: Scan an SBOM for HIGH/CRITICAL vulnerabilities with Grype.
+  params:
+    - name: fail-on-severity
+      type: string
+      default: "high"
+  workspaces:
+    - name: sbom
+      description: Workspace containing the SBOM produced by syft-sbom.
+  steps:
+    - name: scan
+      image: anchore/grype:v0.85.0
+      script: |
+        #!/bin/sh
+        set -eu
+        grype "sbom:$(workspaces.sbom.path)/sbom.cdx.json" \
+          --fail-on "$(params.fail-on-severity)"

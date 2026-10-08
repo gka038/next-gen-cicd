@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: langfuse
+  namespace: argocd
+  annotations:
+    # Runs after clickhouse-operator (wave -1) so its CRDs already exist.
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://langfuse.github.io/langfuse-k8s
+      chart: langfuse
+      targetRevision: 2.1.4
+      helm:
+        releaseName: langfuse
+        valueFiles:
+          - $values/infrastructure/observability/langfuse/values.yaml
+    - repoURL: https://github.com/gka038/next-gen-cicd
+      targetRevision: fm/ngc-1
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

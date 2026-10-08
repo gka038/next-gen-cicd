@@ -1,0 +1,38 @@
+# Single-node sizing for Tempo (grafana/tempo) — this chart is already
+# monolithic (one StatefulSet, local-disk block storage) rather than
+# grafana/tempo-distributed, so it needs little adjustment beyond
+# persistence and modest resource requests.
+replicas: 1
+
+tempo:
+  retention: 48h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  # Feeds span-metrics (RED metrics for the AI agent workloads) into
+  # kube-prometheus-stack so Grafana can show request-rate/error/duration
+  # without a separate metrics pipeline.
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: "http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/api/v1/write"
+    processor:
+      span_metrics:
+        enable_target_info: true
+      service_graphs: {}
+  overrides:
+    defaults:
+      metrics_generator:
+        processors:
+          - service-graphs
+          - span-metrics
+
+persistence:
+  enabled: true
+  size: 10Gi
+  # storageClassName left unset so the cluster's default StorageClass is used.
+
+serviceMonitor:
+  enabled: true

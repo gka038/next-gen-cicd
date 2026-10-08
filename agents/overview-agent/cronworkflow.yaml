@@ -1,0 +1,80 @@
+# Nightly run of an open-source coding agent (OpenHands) that reads this
+# platform's own manifests, the product repo, and the observability stack,
+# then opens PRs against both repos through Forgejo's normal PR path — never
+# auto-merges. Runs as an Argo CronWorkflow since Argo Workflows is already
+# the orchestrator for AI-agent workloads on this cluster.
+#
+# OpenHands' CLI flags move fast upstream; check
+# https://docs.openhands.dev/openhands/usage/cli/command-reference against
+# the pinned image tag below before relying on this as-is.
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: overview-agent
+  namespace: agents-system
+spec:
+  schedule: "0 3 * * *"
+  timezone: "UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  workflowSpec:
+    serviceAccountName: overview-agent
+    entrypoint: run
+    volumes:
+      - name: prompt
+        configMap:
+          name: overview-agent-prompt
+      - name: workspace
+        emptyDir: {}
+    templates:
+      - name: run
+        steps:
+          - - name: clone
+              template: clone-repos
+          - - name: overview-and-pr
+              template: openhands
+
+      - name: clone-repos
+        container:
+          image: alpine/git:2.47.2
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              git clone --depth 50 "https://forgejo.local/${FORGEJO_OWNER}/${FORGEJO_PLATFORM_REPO}.git" /workspace/platform
+              if [ -n "${PRODUCT_REPO_URL:-}" ]; then
+                git clone --depth 50 "${PRODUCT_REPO_URL}" /workspace/product
+              fi
+          envFrom:
+            - secretRef:
+                name: overview-agent-secrets
+          volumeMounts:
+            - { name: workspace, mountPath: /workspace }
+
+      - name: openhands
+        container:
+          image: docker.io/all-hands-ai/openhands:0.58
+          command: ["openhands"]
+          args:
+            - --headless
+            - --override-with-envs
+            - --exit-without-confirmation
+            - -f
+            - /config/task.md
+          env:
+            - name: SANDBOX_RUNTIME
+              value: local
+            - name: WORKSPACE_BASE
+              value: /workspace
+          envFrom:
+            - secretRef:
+                name: overview-agent-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - { name: prompt, mountPath: /config }
+            - { name: workspace, mountPath: /workspace }

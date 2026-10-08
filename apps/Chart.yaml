@@ -1,0 +1,5 @@
+apiVersion: v2
+name: app-of-apps
+description: Root app-of-apps chart — one child Argo CD Application per component group, each toggleable via values.yaml
+type: application
+version: 0.1.0

@@ -1,0 +1,39 @@
+# Single-node sizing for Argo Workflows (argo-cd/argo-workflows).
+# Orchestrates the AI agent workloads (multi-step jobs, fan-out/fan-in) that
+# run on the cluster, and is what the nightly overview-agent (agents/) runs as.
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  # Keep completed Workflow objects around for a while so the overview-agent
+  # has run history to read, but don't let them accumulate forever on one node.
+  workflowDefaults:
+    spec:
+      ttlStrategy:
+        secondsAfterCompletion: 86400
+      podGC:
+        strategy: OnWorkflowSuccess
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  serviceType: ClusterIP
+  # "server" auth mode issues its own bearer tokens instead of requiring each
+  # user's kubeconfig — simpler for a single-operator cluster. See the root
+  # README for how to mint a token.
+  authModes:
+    - server
+  # No cloud LoadBalancer on a single-node cluster: expose via ingress-nginx or
+  # port-forward. See the root README for both options.
+  ingress:
+    enabled: false
+    ingressClassName: nginx
+    hosts:
+      - argo-workflows.local

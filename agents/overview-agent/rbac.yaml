@@ -1,0 +1,45 @@
+# Read-only cluster visibility for the nightly review (node/pod health,
+# events) — everything else (metrics, logs, traces, LLM traces, CI
+# manifests, issues) comes from each component's own HTTP API, not the
+# Kubernetes API, so this intentionally stays narrow and read-only.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agents-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: overview-agent
+  namespace: agents-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: overview-agent-read-only
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "events", "namespaces", "services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "rollouts", "workflows"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: overview-agent-read-only
+subjects:
+  - kind: ServiceAccount
+    name: overview-agent
+    namespace: agents-system
+roleRef:
+  kind: ClusterRole
+  name: overview-agent-read-only
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,101 @@
+# Single-node sizing for kube-prometheus-stack (prometheus-community/kube-prometheus-stack).
+# Control-plane component monitors are disabled: most single-node distros (k3s, kind,
+# k0s, minikube) don't expose the controller-manager/scheduler/etcd/kube-proxy endpoints
+# the way kubeadm clusters do, and the resulting ServiceMonitors just sit in a permanent
+# "down" state. Re-enable the ones your distro does expose.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+
+kube-state-metrics:
+  enabled: true
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  admissionWebhooks:
+    patch:
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 7d
+    # Lets Tempo's metrics-generator (span/service-graph metrics) push
+    # straight into this Prometheus via remote_write.
+    enableRemoteWriteReceiver: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          # storageClassName left unset so the cluster's default StorageClass is used.
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
+grafana:
+  replicas: 1
+  # Placeholder — replace before relying on Grafana, or supply via an existing
+  # secret (`admin.existingSecret`) as the root README documents.
+  adminPassword: "CHANGE_ME_PLACEHOLDER"
+  persistence:
+    enabled: true
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  # No cloud LoadBalancer on a single-node cluster: expose via ingress-nginx or
+  # port-forward. See the root README for both options.
+  ingress:
+    enabled: false
+    ingressClassName: nginx
+    hosts:
+      - grafana.local
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki-gateway.observability.svc.cluster.local
+      access: proxy
+    - name: Tempo
+      type: tempo
+      url: http://tempo.observability.svc.cluster.local:3100
+      access: proxy

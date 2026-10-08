@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: forgejo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Argo CD's OCI Helm resolution drops the chart segment when `chart` is a
+    # separate field alongside a multi-segment `repoURL` (confirmed against a
+    # live cluster) — repoURL must embed the full chart path, with `path: "."`
+    # as the required placeholder since the schema needs one of path/chart/ref.
+    - repoURL: oci://code.forgejo.org/forgejo-helm/forgejo
+      path: "."
+      targetRevision: 17.2.0
+      helm:
+        releaseName: forgejo
+        valueFiles:
+          - $values/infrastructure/scm/forgejo/values.yaml
+    - repoURL: https://github.com/gka038/next-gen-cicd
+      targetRevision: fm/ngc-1
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: forgejo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

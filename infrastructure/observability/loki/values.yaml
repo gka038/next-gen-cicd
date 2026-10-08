@@ -1,0 +1,77 @@
+# Single-node sizing for Loki (grafana/loki) in monolithic mode.
+# SimpleScalable/Distributed modes require object storage and multiple
+# replicas per component — overkill for one node. SingleBinary + filesystem
+# storage keeps this to one StatefulSet pod backed by the default StorageClass.
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+# SimpleScalable's read/write/backend targets default to 3 replicas each;
+# zero them out since SingleBinary mode runs everything in one pod.
+write:
+  replicas: 0
+read:
+  replicas: 0
+backend:
+  replicas: 0
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  persistence:
+    enabled: true
+    size: 10Gi
+  # The chart's default pod anti-affinity requires >1 node; clear it.
+  affinity: {}
+
+# Memcached-backed chunk/results caches default to several GB of memory and
+# add two more pods — not worth it for a single-node, low-volume install.
+# Loki falls back to its in-process cache automatically when these are off.
+resultsCache:
+  enabled: false
+chunksCache:
+  enabled: false
+
+# minio stays disabled: filesystem storage needs no object store on one node.
+minio:
+  enabled: false
+
+gateway:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+  selfMonitoring:
+    enabled: false
+
+lokiCanary:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi

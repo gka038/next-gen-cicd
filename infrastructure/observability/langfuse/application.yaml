@@ -19,7 +19,7 @@ spec:
         valueFiles:
           - $values/infrastructure/observability/langfuse/values.yaml
     - repoURL: https://github.com/gka038/next-gen-cicd
-      targetRevision: fm/ngc-1
+      targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc

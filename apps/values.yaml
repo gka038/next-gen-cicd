@@ -19,7 +19,7 @@ components:
 
 repo:
   url: https://github.com/gka038/next-gen-cicd
-  targetRevision: fm/ngc-1
+  targetRevision: main
 
 destination:
   server: https://kubernetes.default.svc

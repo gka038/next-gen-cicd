@@ -16,10 +16,10 @@ spec:
         valueFiles:
           - $values/infrastructure/delivery/argo-rollouts/values.yaml
     - repoURL: https://github.com/gka038/next-gen-cicd
-      targetRevision: fm/ngc-1
+      targetRevision: main
       ref: values
     - repoURL: https://github.com/gka038/next-gen-cicd
-      targetRevision: fm/ngc-1
+      targetRevision: main
       path: infrastructure/delivery/argo-rollouts/extra
   destination:
     server: https://kubernetes.default.svc

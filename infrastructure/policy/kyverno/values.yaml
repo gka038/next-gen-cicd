@@ -1,0 +1,33 @@
+# Single-node sizing for Kyverno (kyverno/kyverno).
+# Each controller's pod anti-affinity is "preferred" (not "required"), so it's
+# safe on one node — it just never gets to spread. Replicas are pinned to 1
+# explicitly; PodDisruptionBudgets auto-disable below 2 replicas.
+admissionController:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+backgroundController:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+cleanupController:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+reportsController:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi

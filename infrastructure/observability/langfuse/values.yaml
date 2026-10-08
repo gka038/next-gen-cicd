@@ -1,0 +1,67 @@
+# Single-node sizing for Langfuse (langfuse/langfuse-k8s).
+#
+# This is the heaviest component in the stack: it bundles its own Postgres,
+# Valkey (Redis), SeaweedFS (S3-compatible object storage) *and* requires the
+# Altinity ClickHouse Operator (deployed alongside it — see
+# infrastructure/observability/clickhouse-operator/) to run a ClickHouseCluster +
+# KeeperCluster. That's 5 extra stateful workloads for one node. If LLM/agent
+# tracing isn't a priority, turn this component off via apps/values.yaml and
+# rely on the OTel Collector -> Tempo traces for basic agent observability
+# instead.
+langfuse:
+  nextauth:
+    url: http://langfuse.local
+  ingress:
+    enabled: false
+    className: nginx
+    hosts:
+      - host: langfuse.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+postgresql:
+  deploy: true
+  replicaCount: 1
+  storage:
+    requestedSize: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+redis:
+  deploy: true
+
+clickhouse:
+  deploy: true
+  cluster:
+    replicas: 1
+    storage:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+  keeper:
+    enabled: true
+    # A 1-node Keeper ensemble is valid for non-HA; 3/5 are for production HA.
+    replicas: 1
+    storage:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+s3:
+  deploy: true

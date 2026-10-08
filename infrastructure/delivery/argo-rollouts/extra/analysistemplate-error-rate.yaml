@@ -1,0 +1,28 @@
+# Reusable AnalysisTemplate for canary metric-based auto-rollback. A product
+# repo's Rollout references this by name (same namespace, or as a
+# ClusterAnalysisTemplate counterpart if it lives elsewhere) in its
+# `strategy.canary.analysis` step — it doesn't do anything on its own.
+#
+# Queries error rate from kube-prometheus-stack's Prometheus via the service
+# name that chart creates; adjust promql to match your service's metrics.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate
+  namespace: argo-rollouts
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: error-rate
+      interval: 1m
+      count: 5
+      successCondition: result[0] < 0.05
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          query: |
+            sum(rate(http_requests_total{service="{{args.service-name}}",code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))

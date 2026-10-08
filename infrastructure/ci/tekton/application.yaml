@@ -1,0 +1,30 @@
+# Tekton has no official Helm chart — this vendors the pinned upstream release
+# manifests (infrastructure/ci/tekton/manifests/) plus this repo's own
+# Task/Pipeline definitions (tasks/, pipelines/) that wire in Trivy, Syft,
+# Grype and cosign via Tekton Hub catalog resolvers.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tekton
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gka038/next-gen-cicd
+    targetRevision: main
+    path: infrastructure/ci/tekton
+    directory:
+      recurse: true
+      exclude: "application.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tekton-pipelines
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

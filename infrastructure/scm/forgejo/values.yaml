@@ -1,0 +1,63 @@
+# Single-node sizing for the Forgejo Helm chart (oci://code.forgejo.org/forgejo-helm/forgejo).
+# Forgejo is not HA-ready, so replicaCount must stay at 1 regardless of cluster size.
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+persistence:
+  enabled: true
+  size: 5Gi
+  # storageClass left unset so the cluster's default StorageClass is used.
+
+service:
+  http:
+    type: ClusterIP
+  ssh:
+    type: ClusterIP
+
+# No cloud LoadBalancer on a single-node cluster: expose via ingress-nginx or port-forward.
+# See the root README for both options.
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: forgejo.local
+      paths:
+        - path: /
+          pathType: Prefix
+          port: http
+
+gitea:
+  admin:
+    # Bootstrap-only: Forgejo creates this user on first start, then the password
+    # mode below stops it from being silently reset. Change it after first login,
+    # or better, pre-create the `forgejo-admin-secret` Secret documented in the
+    # root README instead of relying on this placeholder.
+    existingSecret: ''
+    username: gitea_admin
+    password: 'CHANGE_ME_PLACEHOLDER'
+    email: 'admin@example.invalid'
+    passwordMode: keepUpdated
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+  config:
+    database:
+      DB_TYPE: sqlite3
+    actions:
+      ENABLED: true
+    server:
+      SSH_PORT: 22
+      SSH_LISTEN_PORT: 2222
+    repository:
+      ENABLE_PUSH_CREATE_USER: true
+    service:
+      DISABLE_REGISTRATION: true

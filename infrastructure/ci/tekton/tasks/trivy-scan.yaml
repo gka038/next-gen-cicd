@@ -1,0 +1,28 @@
+# Fails the TaskRun (exit-code 1) on any HIGH/CRITICAL vulnerability, so a
+# Pipeline that includes this Task blocks the image from reaching Harbor.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: trivy-scan
+  namespace: tekton-pipelines
+spec:
+  description: Scan a container image for HIGH/CRITICAL vulnerabilities with Trivy.
+  params:
+    - name: image
+      type: string
+      description: Fully-qualified image reference to scan (registry/repo:tag).
+    - name: severity
+      type: string
+      default: "HIGH,CRITICAL"
+  steps:
+    - name: scan
+      image: aquasec/trivy:0.57.1
+      script: |
+        #!/bin/sh
+        set -eu
+        trivy image \
+          --exit-code 1 \
+          --severity "$(params.severity)" \
+          --ignore-unfixed \
+          --no-progress \
+          "$(params.image)"

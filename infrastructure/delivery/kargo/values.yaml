@@ -1,0 +1,36 @@
+# Single-node sizing for Kargo (oci://ghcr.io/akuity/kargo-charts/kargo).
+# Promotes a build across stages (e.g. dev -> staging -> prod) once Argo CD
+# has synced it — optional on top of Argo Rollouts; skip it by deleting this
+# directory if stage promotion isn't needed yet.
+api:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  adminAccount:
+    enabled: true
+    # Placeholders — replace both before relying on Kargo. Generate a bcrypt
+    # hash with `htpasswd -nbBC 10 "" <password> | tr -d ':\n' | sed 's/^\$2y/\$2a/'`
+    # and a signing key with `openssl rand -base64 29 | tr -d "=+/" | cut -c1-32`.
+    passwordHash: "CHANGE_ME_PLACEHOLDER_BCRYPT_HASH"
+    tokenSigningKey: "CHANGE_ME_PLACEHOLDER_SIGNING_KEY"
+  # No cloud LoadBalancer on a single-node cluster: expose via ingress-nginx or
+  # port-forward. See the root README for both options.
+  ingress:
+    enabled: false
+    ingressClassName: nginx
+    host: kargo.local
+
+controller:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+externalWebhooksServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi

@@ -1,0 +1,89 @@
+# Single-node sizing for the Harbor Helm chart (harbor/harbor).
+# Harbor's internal Postgres, Redis (valkey) and Trivy adapter are used instead of
+# external dependencies, keeping this to a single chart install on one node.
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: auto
+  ingress:
+    hosts:
+      core: harbor.local
+    className: nginx
+
+externalURL: https://harbor.local
+
+# Placeholder — replace before relying on Harbor. See the root README for how to
+# supply this via `kubectl create secret` / Argo CD instead of committing a real value.
+harborAdminPassword: "CHANGE_ME_PLACEHOLDER"
+
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      size: 10Gi
+    jobservice:
+      jobLog:
+        size: 1Gi
+    database:
+      size: 2Gi
+    redis:
+      size: 1Gi
+    trivy:
+      size: 5Gi
+
+database:
+  type: internal
+  internal:
+    password: "CHANGE_ME_PLACEHOLDER"
+
+redis:
+  type: internal
+
+trivy:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+core:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+jobservice:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+registry:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+portal:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+exporter:
+  replicas: 1
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true

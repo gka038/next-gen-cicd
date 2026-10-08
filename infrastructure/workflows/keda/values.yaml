@@ -1,0 +1,23 @@
+# Single-node sizing for KEDA (kedacore/keda). Scales AI agent workload
+# Deployments/Jobs on custom metrics (queue depth, Argo Workflows backlog,
+# etc.) — operator/metrics-server/webhooks are already 1 replica each by
+# chart default; this just trims the default 1000Mi limits down.
+resources:
+  operator:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      memory: 512Mi
+  metricServer:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      memory: 512Mi
+  webhooks:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi

@@ -1,0 +1,82 @@
+# Reference pipeline a product repo's Forgejo Actions / Tekton Trigger wires
+# up: clone -> build & push to Harbor -> scan -> (Tekton Chains signs the
+# pushed image automatically once the build Task reports IMAGE_URL/
+# IMAGE_DIGEST results — see the CI README for the Chains key setup this
+# depends on).
+#
+# git-clone and buildah come from the Tekton Hub catalog via the `hub`
+# resolver rather than being vendored, so they stay current without a repo
+# change; trivy-scan/syft-sbom/grype-scan are this repo's own Tasks.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: build-scan-sign
+  namespace: tekton-pipelines
+spec:
+  description: Clone, build & push to Harbor, then scan with Trivy + Grype. Tekton Chains signs the result.
+  params:
+    - name: repo-url
+      type: string
+    - name: revision
+      type: string
+      default: main
+    - name: image
+      type: string
+      description: Fully-qualified destination image, e.g. harbor.local/<project>/<app>:<tag>.
+  workspaces:
+    - name: source
+    - name: sbom
+    - name: dockerconfig
+      description: Workspace holding a .dockerconfigjson for pushing to Harbor.
+  tasks:
+    - name: clone
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: kind, value: task }
+          - { name: name, value: git-clone }
+          - { name: version, value: "0.9" }
+      workspaces:
+        - { name: output, workspace: source }
+      params:
+        - { name: url, value: $(params.repo-url) }
+        - { name: revision, value: $(params.revision) }
+
+    - name: build-and-push
+      runAfter: [clone]
+      taskRef:
+        resolver: hub
+        params:
+          - { name: catalog, value: tekton-catalog-tasks }
+          - { name: kind, value: task }
+          - { name: name, value: buildah }
+          - { name: version, value: "0.9" }
+      workspaces:
+        - { name: source, workspace: source }
+        - { name: dockerconfig, workspace: dockerconfig }
+      params:
+        - { name: IMAGE, value: $(params.image) }
+
+    - name: trivy-scan
+      runAfter: [build-and-push]
+      taskRef:
+        name: trivy-scan
+      params:
+        - { name: image, value: $(params.image) }
+
+    - name: syft-sbom
+      runAfter: [build-and-push]
+      taskRef:
+        name: syft-sbom
+      workspaces:
+        - { name: output, workspace: sbom }
+      params:
+        - { name: image, value: $(params.image) }
+
+    - name: grype-scan
+      runAfter: [syft-sbom]
+      taskRef:
+        name: grype-scan
+      workspaces:
+        - { name: sbom, workspace: sbom }

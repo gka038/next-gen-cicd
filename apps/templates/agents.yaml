@@ -1,0 +1,29 @@
+{{- if .Values.components.agents }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agents
+  namespace: argocd
+  annotations:
+    # Runs after workflows (Argo Workflows CRDs) and ci (Forgejo Actions runner
+    # registration) so the CronWorkflow it deploys has somewhere to run and a
+    # repo API to call into.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repo.url }}
+    targetRevision: {{ .Values.repo.targetRevision }}
+    path: agents
+    directory:
+      recurse: true
+      include: "**/application.yaml"
+  destination:
+    server: {{ .Values.destination.server }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+{{- end }}

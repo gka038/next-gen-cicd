@@ -1,0 +1,30 @@
+# Langfuse's ClickHouse store is managed by the Altinity ClickHouse Operator CRDs
+# (ClickHouseCluster/KeeperCluster), so the operator has to land and establish its
+# CRDs before the langfuse Application can sync. The sync-wave ordering below
+# handles that within one Argo CD "observability" app-of-apps group.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clickhouse-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://docs.altinity.com/clickhouse-operator/
+    chart: altinity-clickhouse-operator
+    targetRevision: 0.27.4
+    helm:
+      releaseName: clickhouse-operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,24 @@
+# Generates a CycloneDX SBOM for the built image and writes it to a shared
+# workspace so a later step (or Tekton Chains) can attach/attest it.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: syft-sbom
+  namespace: tekton-pipelines
+spec:
+  description: Generate a CycloneDX SBOM for a container image with Syft.
+  params:
+    - name: image
+      type: string
+      description: Fully-qualified image reference to scan (registry/repo:tag).
+  workspaces:
+    - name: output
+      description: Workspace the SBOM file is written into.
+  steps:
+    - name: sbom
+      image: anchore/syft:v1.18.0
+      script: |
+        #!/bin/sh
+        set -eu
+        syft "$(params.image)" \
+          -o cyclonedx-json="$(workspaces.output.path)/sbom.cdx.json"

@@ -1,0 +1,25 @@
+# Per-component-group enable/disable toggle. Each `true` below turns into one
+# child Argo CD Application (an "app of apps") whose `source.directory` points
+# at the matching infrastructure/<group> path and recurses into every
+# component Application file it finds there. Flip a group to `false` and
+# `helm upgrade` this release (or let Argo CD self-heal it) to tear it down.
+#
+# See the root README for what each group contains and which ones are
+# genuinely heavy for a single node.
+components:
+  scm: true
+  ci: true
+  registry: true
+  delivery: true
+  workflows: true
+  observability: true
+  policy: true
+  secrets: true
+  agents: true
+
+repo:
+  url: https://github.com/gka038/next-gen-cicd
+  targetRevision: main
+
+destination:
+  server: https://kubernetes.default.svc

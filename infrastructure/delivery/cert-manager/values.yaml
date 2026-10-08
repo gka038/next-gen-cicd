@@ -1,0 +1,29 @@
+# cert-manager (jetstack/cert-manager) — Kargo's webhook server requires a
+# cert-manager-issued certificate (webhooksServer.tls.selfSignedCert: true,
+# the chart's own strongly-recommended default) and there's no provision for
+# running it without TLS. Installed here rather than assumed pre-existing,
+# since most single-node distros don't ship it.
+crds:
+  enabled: true
+
+replicaCount: 1
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+webhook:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+
+cainjector:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi

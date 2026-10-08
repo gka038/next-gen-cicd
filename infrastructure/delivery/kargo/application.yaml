@@ -3,13 +3,20 @@ kind: Application
 metadata:
   name: kargo
   namespace: argocd
+  annotations:
+    # Must land after cert-manager, whose CRDs + webhook its own webhook
+    # server's self-signed certificate depends on.
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    - repoURL: oci://ghcr.io/akuity/kargo-charts
-      chart: kargo
+    # See the matching comment in infrastructure/scm/forgejo/application.yaml
+    # for why this is repoURL-embeds-chart + path: "." rather than repoURL +
+    # a separate chart field.
+    - repoURL: oci://ghcr.io/akuity/kargo-charts/kargo
+      path: "."
       targetRevision: 1.12.2
       helm:
         releaseName: kargo

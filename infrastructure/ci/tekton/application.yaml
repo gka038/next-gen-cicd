@@ -13,7 +13,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/gka038/next-gen-cicd
-    targetRevision: main
+    targetRevision: fm/ngc-1
     path: infrastructure/ci/tekton
     directory:
       recurse: true
